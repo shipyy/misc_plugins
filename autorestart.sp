@@ -12,21 +12,23 @@ public Plugin myinfo =
 #include <colorlib>
 #include <autoexecconfig>
 
-char g_szLogFile[PLATFORM_MAX_PATH];
+char LogFilePath[PLATFORM_MAX_PATH];
 
 ConVar ScheduleTimeStamp;
+ConVar ForceRetry;
 
 public void OnPluginStart()
 {
     if (!DirExists("addons/sourcemod/logs/autorestart"))
         CreateDirectory("addons/sourcemod/logs/autorestart", 511);
-    BuildPath(Path_SM, g_szLogFile, sizeof(g_szLogFile), "logs/autorestart/autorestart.log");
+    BuildPath(Path_SM, LogFilePath, sizeof(LogFilePath), "logs/autorestart/autorestart.log");
 
     AutoExecConfig_SetCreateDirectory(true);
     AutoExecConfig_SetCreateFile(true);
     AutoExecConfig_SetFile("autorestart");
 
     ScheduleTimeStamp = AutoExecConfig_CreateConVar("sm_timestamp_restart", "060000", "specifies value of server restart in H-M-S format", _, true, 0.0, true, 240000.0);
+    ForceRetry = AutoExecConfig_CreateConVar("sm_force_retry", "1", "force clients to retry after server restart", _, true, 0.0, true, 1.0);
 
     AutoExecConfig_ExecuteFile();
     AutoExecConfig_CleanFile();
@@ -45,9 +47,17 @@ public void Restart()
     //LOG TO LOGFILE
     char currentTime_formatted[32];
     FormatTime(currentTime_formatted, sizeof currentTime_formatted, "%d/%m/%G %H:%M:%S", GetTime());
-    LogToFile(g_szLogFile, "[AutoRestart] | %s | Restarting Server...", currentTime_formatted);
+    LogToFile(LogFilePath, "[AutoRestart] | %s | Restarting Server...", currentTime_formatted);
 
-    ServerCommand("_restart");
+    //FOR CLIENTS RETRY
+    if (ForceRetry.BoolValue) {
+        for(int i = 1; i <= MaxClients; i++)
+            if (IsClientInGame(i) && !IsFakeClient(i))
+                ClientCommand(i, "retry");
+    }
+    else {
+        ServerCommand("_restart");
+    }
 }
 
 public Action TimeCheck(Handle timer, any data)

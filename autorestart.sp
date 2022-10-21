@@ -55,9 +55,8 @@ public void Restart()
             if (IsClientInGame(i) && !IsFakeClient(i))
                 ClientCommand(i, "retry");
     }
-    else {
-        ServerCommand("_restart");
-    }
+
+    ServerCommand("_restart");
 }
 
 public Action TimeCheck(Handle timer, any data)

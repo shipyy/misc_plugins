@@ -30,6 +30,8 @@ public void OnPluginStart()
     ScheduleTimeStamp = AutoExecConfig_CreateConVar("sm_timestamp_restart", "060000", "specifies value of server restart in H-M-S format", _, true, 0.0, true, 240000.0);
     ForceRetry = AutoExecConfig_CreateConVar("sm_force_retry", "1", "force clients to retry after server restart", _, true, 0.0, true, 1.0);
 
+    RegServerCmd("sm_restart_server", RestartServer, "[AutoRestart] Restarts Server");
+
     AutoExecConfig_ExecuteFile();
     AutoExecConfig_CleanFile();
 }
@@ -42,7 +44,7 @@ public void OnConfigsExecuted()
 public void Restart()
 {
     //LOG TO CONSOLE
-    LogAction(0, -1, "[AutoRestart] Restarting Server...");
+    LogAction(0, -1, "Restarting Server...");
 
     //LOG TO LOGFILE
     char currentTime_formatted[32];
@@ -114,4 +116,21 @@ public Action TimeCheck(Handle timer, any data)
     }
 
     return Plugin_Continue;
+}
+
+public Action RestartServer(int args)
+{
+    if(GetClientCount() == 0) {
+        //LOG TO CONSOLE
+        LogAction(0, -1, "Restarting Server...");
+
+        //LOG TO FILE
+        char currentTime_formatted[32];
+        FormatTime(currentTime_formatted, sizeof currentTime_formatted, "%d/%m/%G %H:%M:%S", GetTime());
+        LogToFile(LogFilePath, "[AutoRestart] | %s | Forcing Restart, Server was hibernating...", currentTime_formatted);
+
+        ServerCommand("_restart");
+    }
+
+    return Plugin_Handled;
 }

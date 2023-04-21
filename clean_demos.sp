@@ -29,19 +29,32 @@ public Action CleanDemos(int args)
     char sPath[128];
     char fileName_Buffer[256];
     char split_filename[256][2];
+    char currentTime_formatted[32];
 
+    //LOG START
+    FormatTime(currentTime_formatted, sizeof currentTime_formatted, "%d/%m/%G %H:%M:%S", GetTime());
+    LogToFile(LogFilePath, "| Began Deleting Demos | %s", currentTime_formatted);
+
+    //RELATIVE PATH TO SOURCEMOD FOLDER
     Format(sPath, sizeof sPath, "./%s", Path_SM);
-
     dl = OpenDirectory(sPath);
     while( dl.GetNext(fileName_Buffer, sizeof fileName_Buffer) )
     {
+        //SPLIT FILE EXTENSION
         ExplodeString(fileName_Buffer, ".", split_filename, sizeof split_filename[], sizeof split_filename);
-        if ( StrContains(split_filename[1], "dem" , true) != -1 && StrContains(fileName_Buffer, "." , true) != -1) {
-            LogToFile(LogFilePath, " | Deleting File %s", fileName_Buffer);
+        //FITLER .DEM FILES
+        if ( StrContains(split_filename[1], "dem" , true) != -1 && StrContains(fileName_Buffer, "." , true) != -1)
+        {
+            //LOG EACH FILE
+            LogToFile(LogFilePath, "| '%s'", fileName_Buffer);
             Format(sPath, sizeof sPath, "%s/%s", Path_SM, fileName_Buffer);
             DeleteFile(sPath);
         }
     }
+
+    //LOG END
+    FormatTime(currentTime_formatted, sizeof currentTime_formatted, "%d/%m/%G %H:%M:%S", GetTime());
+    LogToFile(LogFilePath, "| Ended Deleting Demos | %s", currentTime_formatted);
 
     return Plugin_Handled;
 }

@@ -199,7 +199,7 @@ public int ConvertToSeconds(int value, int type)
 
     switch (type) {
         case 1: return ( ( (value / 100) * 60 ) + value % 100 );
-        case 2: return ( ( (value / 10000) * 3600 ) + ( ((value % 10000)/100) * 60 ) + ( ( (value % 10000)/100 ) % 100 ) );
+        case 2: return ( ( (value / 10000) * 3600 ) + ( ((value % 10000)/100) * 60 ) + ( value % 100 );
     }
 
     return -1;

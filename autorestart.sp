@@ -1,3 +1,7 @@
+//THIS PLUGINS IS INTENDED TO USE WITH A CRONTABS CREATED
+//CONTRAB 1 -> EVERYDAY AT 00:00:00 TO RUN sm_set_sod_unix_timestamp
+//CONTRAB 2 -> WITH THE EXACT SAME SCHEDULE SET IN THE AUTOSTART.CFG FOR THE FIELD 'sm_timestamp_restart'
+
 public Plugin myinfo =
 {
 	name = "autorestart",

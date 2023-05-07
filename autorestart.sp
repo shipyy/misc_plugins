@@ -186,7 +186,7 @@ public Action StartofDay(int args)
     //WRITE TIMESTAMP TO UNIX TIMESTAMP FILES
     int SOD = GetTime();
 
-    LogToFile(UNIX_CURRENTDAY_LOGFILE, "%s", SOD);
+    LogToFile(UNIX_CURRENTDAY_LOGFILE, "%d", SOD);
 
     return Plugin_Handled;
 }

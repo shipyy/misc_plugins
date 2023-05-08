@@ -17,7 +17,6 @@ public void OnPluginStart()
 {
     if (!DirExists("addons/sourcemod/logs/clean_demos"))
         CreateDirectory("addons/sourcemod/logs/clean_demos", 511);
-    BuildPath(Path_SM, LogFilePath, sizeof(LogFilePath), "logs/clean_demos/cleandemos.log");
 
     RegServerCmd("sm_clean_demos", CleanDemos, "[CleanDemos] Deletes .dem files");
 
@@ -33,6 +32,12 @@ public Action CleanDemos(int args)
 
     //LOG START
     FormatTime(currentTime_formatted, sizeof currentTime_formatted, "%d/%m/%G %H:%M:%S", GetTime());
+
+    char weekly_file[16];
+    FormatTime(weekly_file, sizeof weekly_file, "%F", GetTime());
+
+    BuildPath(Path_SM, LogFilePath, sizeof(LogFilePath), "logs/clean_demos/cleandemos_%s.log", weekly_file);
+
     LogToFile(LogFilePath, "| Began Deleting Demos | %s", currentTime_formatted);
 
     //RELATIVE PATH TO SOURCEMOD FOLDER

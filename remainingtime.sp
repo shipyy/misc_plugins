@@ -7,26 +7,26 @@ public Plugin myinfo =
 	url         = "https://github.com/shipyy/misc_plugins"
 };
 
-#include <sourcemod>
-#include <multicolors>
 #pragma newdecls required
 #pragma semicolon 1
+#include <sourcemod>
+#include <multicolors>
 
-public void OnMapStart(){
-
+public void OnMapStart()
+{
     //CREATE TIMER FOR QUALIFIERS REMAINING TIME
-	//FINAL DATE IN EPOCH TIME (SECONDS) == 1665360000
-	CreateTimer(360.0, QualifiersRemainingTime, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+    //FINAL DATE IN EPOCH TIME (SECONDS) == 1698710400
+    CreateTimer(300.0, QualifiersRemainingTime, INVALID_HANDLE, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 }
 
 public Action QualifiersRemainingTime(Handle timer)
 {
-    int remaining_time = 1665360000 - GetTime();
+    int remaining_time = 1698710400 - GetTime();
     char szRemainingTimeFormatted[32];
     FormatTimeFloat(0, remaining_time * 1.0, szRemainingTimeFormatted, sizeof szRemainingTimeFormatted);
 
     char szFinal[128];
-    Format(szFinal, sizeof szFinal, "{green}PENALTE | {yellow}%s{darkred} para o qualificador acabar!", szRemainingTimeFormatted);
+    Format(szFinal, sizeof szFinal, "{lime}Torneio | {yellow}%s{darkred} para o qualificador acabar!", szRemainingTimeFormatted);
 
     CPrintToChatAll("%s", szFinal);
 

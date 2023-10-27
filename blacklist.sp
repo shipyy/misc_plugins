@@ -61,12 +61,12 @@ public void LoadBlackList()
 public void OnClientPostAdminCheck(int client)
 {
     char client_steamid[32];
-    GetClientAuthId(client, AuthId_Steam2, client_steamid, MAX_NAME_LENGTH, true);
+    GetClientAuthId(client, AuthId_SteamID64, client_steamid, MAX_NAME_LENGTH, true);
 
     if (g_Blacklist.Length != 0)
         if(g_Blacklist.FindString(client_steamid) != -1) {
             PrintToConsole(0, "[BlackList] Client (%s) Connected Found in Blacklist!", client_steamid);
-            KickClient(client, "No.");
+            KickClient(client, "");
         }
 
 }

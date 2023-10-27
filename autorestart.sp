@@ -23,7 +23,10 @@ char UNIX_CURRENTDAY_LOGFILE[PLATFORM_MAX_PATH];
 
 ConVar ScheduleTimeStamp;
 ConVar ForceRetry;
+ConVar AnnounceTimes;
 File SOD_UnixStamps;
+ArrayList AnnounceTimes_List_Seconds;
+ArrayList AnnounceTimes_List_Unconverted;
 
 char sSOD_UnixTimestamp[128];
 
@@ -41,6 +44,7 @@ public void OnPluginStart()
 
     ScheduleTimeStamp = AutoExecConfig_CreateConVar("sm_timestamp_restart", "060000", "specifies value of server restart in H-M-S format", _, true, 0.0, true, 240000.0);
     ForceRetry = AutoExecConfig_CreateConVar("sm_force_retry", "1", "force clients to retry after server restart", _, true, 0.0, true, 1.0);
+    AnnounceTimes = AutoExecConfig_CreateConVar("sm_announce_times", "5M/1M/30S/5S/4S/3S/2S/1S", "when to announce remaining time for restart");
 
     RegServerCmd("sm_restart_server", RestartServer, "[AutoRestart] Restarts Server");
     RegServerCmd("sm_set_sod_unix_timestamp", StartofDay, "[AutoRestart] Sets Start of Day Unix Timestamp");
@@ -64,17 +68,72 @@ public void OnPluginStart()
         Format(sSOD_UnixTimestamp, sizeof sSOD_UnixTimestamp, "%s", szTempLine_SPLIT[5]);
         TrimString(sSOD_UnixTimestamp);
     }
+
+    AnnounceTimes_List_Unconverted = new ArrayList(8);
+    AnnounceTimes_List_Seconds = new ArrayList(8);
 }
 
 public void OnConfigsExecuted()
 {
+    SetupAnnouncementTimes();
+
     CreateTimer(1.0, TimeCheck, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+}
+
+void SetupAnnouncementTimes()
+{
+    //GET STRING FROM CFG
+    char UnfilteredAnnounceTimes[256];
+    AnnounceTimes.GetString(UnfilteredAnnounceTimes, sizeof UnfilteredAnnounceTimes);
+
+    //ALLOW 15 MAX ANNOUNCE TIMES
+    char UnfilteredAnnounceTimes_ExplodedString[15][8];
+    ExplodeString(UnfilteredAnnounceTimes, "/", UnfilteredAnnounceTimes_ExplodedString, sizeof UnfilteredAnnounceTimes_ExplodedString, sizeof UnfilteredAnnounceTimes_ExplodedString[]);
+
+    //TRANSFORM SPLIT STRINGS INTO ARRAYLIST AND FILTER DUPLICATES
+    for(int i = 0; i < 15; i++) {
+        if ( strcmp(UnfilteredAnnounceTimes[i], "", false) == 0 )
+            break;
+
+        //IF THE VALUES IS NEW ADD IT
+        if ( AnnounceTimes_List_Unconverted.FindString(UnfilteredAnnounceTimes_ExplodedString[i]) == -1) {
+            AnnounceTimes_List_Unconverted.PushString(UnfilteredAnnounceTimes_ExplodedString[i]);
+        }
+    }
+
+    //CONVERT ALL TIMES TO SECONDS
+    char temp_string[8];
+    char last_char;
+    for(int i = 0; i < AnnounceTimes_List_Unconverted.Length; i++)
+    {
+        AnnounceTimes_List_Unconverted.GetString(i, temp_string, sizeof temp_string);
+
+        if ( strcmp(temp_string, "", false) == 0 )
+            break;
+
+        //REMOVE LAST CHAR
+        last_char = temp_string[strlen(temp_string) - 1];
+        ReplaceString(temp_string, sizeof temp_string, temp_string[strlen(temp_string) - 1], "", false);
+
+        //CONVERT TIME TO SECONDS & ONLY ADD IF NOT DUPLICATE
+        if ( AnnounceTimes_List_Seconds.FindValue(StringToInt(temp_string)) == -1) {
+            AnnounceTimes_List_Seconds.Push(ConvertAnnounceTimesToSeconds(StringToInt(temp_string), last_char));
+        }
+    }
+
+}
+
+void AnnounceTime(int current_time, int restart_time)
+{
+    int time_diff = restart_time - current_time;
+    if ( AnnounceTimes_List_Seconds.FindValue(time_diff) != -1 ) {
+        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in %s", FormattedTime(time_diff));
+        PrintToConsole(0, "Daily server restart in %s", FormattedTime(time_diff));
+    }
 }
 
 void Restart(bool hibernating = false)
 {
-    int SOD = GetTime();
-
     //LOG TO CONSOLE
     LogAction(0, -1, "Restarting Server...");
 
@@ -95,6 +154,11 @@ void Restart(bool hibernating = false)
 
     //ADD START OF DAY UNIX TIMESTAMP TO FILE
     //EVERYDAY AT 00:00:00 GET THE UNIX TIMESTAMP THAT CORRESPONDS TO IT (SAVE IT ON A FILE?, PROBABLY SINCE RESTART RELOADS PROGRAM VALUES U DUMB CUNT!)
+    int SOD = GetTime();
+
+    //REMOVE EXTRA TIME FORM THE SOD TIMESTAMP
+    SOD -= ( SOD  % 10 );
+
     if( ScheduleTimeStamp.IntValue == 0 ) {
         LogToFile(UNIX_CURRENTDAY_LOGFILE, "%d", SOD);
     }
@@ -107,12 +171,6 @@ public Action TimeCheck(Handle timer, any data)
     //GetTime() RETURNS TIMESTAMP IN UNIX (SECONDS)
     int currentTime = GetTime();
 
-    //ADD START OF DAY UNIX TIMESTAMP TO FILE
-    //EVERYDAY AT 00:00:00 GET THE UNIX TIMESTAMP THAT CORRESPONDS TO IT (SAVE IT ON A FILE?, PROBABLY SINCE RESTART RELOADS PROGRAM VALUES U DUMB CUNT!)
-    if( ScheduleTimeStamp.IntValue == 0 ) {
-        LogToFile(UNIX_CURRENTDAY_LOGFILE, "%d", currentTime);
-    }
-
     //GET RESTART TIME
     int restarttime = ScheduleTimeStamp.IntValue;
 
@@ -124,49 +182,11 @@ public Action TimeCheck(Handle timer, any data)
         restarttime = StringToInt(sSOD_UnixTimestamp) + ConvertToSeconds(restarttime, 2);
     }
 
+    //RESTART IF TIMES ALIGN
     if ( currentTime == restarttime )
         Restart();
 
-    //CHECK FOR 5 MINUTES
-    if ( currentTime == restarttime - 360 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 5 minutes...");
-        PrintToConsole(0, "Daily server restart in 5 minutes...");
-    }
-    //CHECK FOR 1 MINUTES
-    if ( currentTime == restarttime - 60 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 1 minute...");
-        PrintToConsole(0, "Daily server restart in 1 minute...");
-    }
-    //CHECK FOR 30 SECONDS
-    if ( currentTime == restarttime - 30 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 30 seconds...");
-        PrintToConsole(0, "Daily server restart in 30 seconds...");
-    }
-    //CHECK FOR 5 SECONDS
-    if ( currentTime == restarttime - 5 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 5 seconds...");
-        PrintToConsole(0, "Daily server restart in 5 seconds...");
-    }
-    //CHECK FOR 4 SECONDS
-    if ( currentTime == restarttime - 4 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 4 seconds...");
-        PrintToConsole(0, "Daily server restart in 4 seconds...");
-    }
-    //CHECK FOR 3 SECONDS
-    if ( currentTime == restarttime - 3 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 3 seconds...");
-        PrintToConsole(0, "Daily server restart in 3 seconds...");
-    }
-    //CHECK FOR 2 SECONDS
-    if ( currentTime == restarttime - 2 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 2 seconds...");
-        PrintToConsole(0, "Daily server restart in 2 seconds...");
-    }
-    //CHECK FOR 1 SECOND
-    if ( currentTime == restarttime - 1 ) {
-        CPrintToChatAll("{lime}PTS{default} | {lightblue}Daily server restart in 1 second...");
-        PrintToConsole(0, "Daily server restart in 1 second...");
-    }
+    AnnounceTime(currentTime, restarttime);
 
     return Plugin_Continue;
 }
@@ -186,6 +206,9 @@ public Action StartofDay(int args)
     //WRITE TIMESTAMP TO UNIX TIMESTAMP FILES
     int SOD = GetTime();
 
+    //REMOVE EXTRA TIME FORM THE SOD TIMESTAMP
+    SOD -= ( SOD  % 10 );
+
     LogToFile(UNIX_CURRENTDAY_LOGFILE, "%d", SOD);
 
     return Plugin_Handled;
@@ -203,4 +226,96 @@ public int ConvertToSeconds(int value, int type)
     }
 
     return -1;
+}
+
+public int ConvertAnnounceTimesToSeconds(int value, int type)
+{
+    switch ( type ) {
+        case 'D':
+            return value * 86400 ;
+        case 'H':
+            return value * 3600 ;
+        case 'M':
+            return value * 60 ;
+        case 'S':
+            return value;
+        default:
+            return value;
+    }
+}
+
+char[] FormattedTime(int time)
+{
+    char final_string[32];
+
+    char szDays[16];
+    char szHours[16];
+    char szMinutes[16];
+    char szSeconds[16];
+
+    int days = time / 86400;
+    int hours = (time - (days * 86400)) / 3600;
+    int minutes = (time - (days * 86400) - (hours * 3600)) / 60;
+    int seconds = (time - (days * 86400) - (hours * 3600) - (minutes * 60));
+
+    //DAYS
+    if ( days == 0 )
+        Format(szDays, 16, "0");
+    else if ( days > 1 )
+        Format(szDays, 16, "%d Days", days);
+    else if ( days == 1 )
+        Format(szDays, 16, "%d Day", days);
+
+    //HOURS
+    if ( hours == 0 )
+        Format(szHours, 16, "0");
+    if ( hours > 1 )
+        Format(szHours, 16, "%d Hours", hours);
+    else if ( hours == 1 )
+        Format(szHours, 16, "%d Hour", hours);
+
+    //MINUTES
+    if ( minutes == 0 )
+        Format(szMinutes, 16, "0");
+    if ( minutes > 1 )
+        Format(szMinutes, 16, "%d Minutes", minutes);
+    else if ( minutes == 1 )
+        Format(szMinutes, 16, "%d Minute", minutes);
+
+    //SECONDS
+    if ( seconds == 0 )
+        Format(szSeconds, 16, "0");
+    if ( seconds > 1 )
+        Format(szSeconds, 16, "%d Seconds", seconds);
+    else if ( seconds == 1 )
+        Format(szSeconds, 16, "%d Second", seconds);
+
+    if (days > 0) {
+        Format(final_string, sizeof final_string, "%s", szDays);
+        if ( hours > 0 )
+            Format(final_string, sizeof final_string, "%s %s...", szDays, szHours);
+        if ( minutes > 0 )
+            Format(final_string, sizeof final_string, "%s %s %s...", szDays, szHours, szMinutes);
+        if ( seconds > 0 )
+            Format(final_string, sizeof final_string, "%s %s %d %s", szDays, szHours, szMinutes, szSeconds);
+    }
+    else if (hours > 0) {
+        Format(final_string, sizeof final_string, "%s...", szHours);
+        if ( minutes > 0 )
+            Format(final_string, sizeof final_string, "%s %s...", szHours, szMinutes);
+        if( seconds > 0 )
+            Format(final_string, sizeof final_string, "%s %s %s...", szHours, szMinutes, szSeconds);
+    }
+    else if ( minutes > 0 ) {
+        Format(final_string, sizeof final_string, "%s...", szMinutes);
+        if( seconds > 0 )
+            Format(final_string, sizeof final_string, "%s %s...", szMinutes, szSeconds);
+    }
+    else {
+        Format(final_string, sizeof final_string, "%s...", szSeconds);
+    }
+
+    ReplaceString(final_string, sizeof final_string, " 0 ", " ", false);
+
+    return final_string;
 }
